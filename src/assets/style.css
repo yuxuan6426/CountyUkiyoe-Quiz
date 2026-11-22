@@ -188,7 +188,7 @@ fieldset { min-width: 0; padding: 0; margin: 0; border: 0; }
   font-weight: 700;
   line-height: 1.5;
 }
-.progress-track { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: .95rem 0 1.4rem; }
+.progress-track { display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; gap: 4px; margin: .95rem 0 1.4rem; }
 .progress-track span { height: 5px; background: #d5d5bd; }
 .progress-track .done { background: var(--ink); }
 .progress-track .active { background: var(--red); }
@@ -211,7 +211,9 @@ fieldset { min-width: 0; padding: 0; margin: 0; border: 0; }
 .option:has(:checked) { background: #f9e9aa; border-color: var(--ink); box-shadow: inset 3px 0 var(--ink); }
 .option:has(:focus-visible) { outline: 3px solid var(--red); outline-offset: 2px; }
 .option input { width: 1.16rem; height: 1.16rem; margin: 0; accent-color: var(--ink); }
-.question-controls { margin-top: 1.25rem; }
+.question-controls { margin-top: 1.25rem; flex-wrap: wrap; }
+#finish { margin-inline-start: auto; }
+#finish-hint { margin-top: .5rem; }
 
 .result {
   margin-block: clamp(1.7rem, 5vw, 4rem);
@@ -294,5 +296,7 @@ fieldset { min-width: 0; padding: 0; margin: 0; border: 0; }
   .wrap { width: calc(100% - 24px); }
   .duo-cards { grid-template-columns: 1fr; }
   .duo-role { grid-template-columns: minmax(0, .56fr) 1fr; }
+  #pair-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
+  #pair-cards .duo-role { grid-template-columns: 1fr; padding: .5rem; }
 }
 @media (prefers-reduced-motion: reduce) { .reveal { animation: none; } }

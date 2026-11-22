@@ -4,7 +4,6 @@ import argparse
 from collections import Counter
 from hashlib import sha256
 from html import escape
-from itertools import combinations_with_replacement
 import json
 from pathlib import Path
 import re
@@ -13,11 +12,13 @@ from string import Template
 import subprocess
 from urllib.parse import urlsplit
 
+from catalog import load_catalog, STYLES
 from vendor.qrcodegen import QrCode
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
 TITLE = "县城隐藏属性测试"
+VERSION = "v2"
 SOURCE = "https://github.com/yuxuan6426/CountyUkiyoe-Quiz"
 GALLERY_SOURCE = "https://github.com/yuxuan6426/CountyUkiyoe"
 GALLERY = "https://xian.yuxuan.wiki/"
@@ -64,11 +65,11 @@ def load_deck():
         counts.update(role for role, _ in options)
     if counts != {role_id: 4 for role_id in roles}:
         raise ValueError("Every role must appear in four choices across the quiz.")
-    expected = {"-".join(pair) for pair in combinations_with_replacement(sorted(roles), 2)}
-    if (deck["pairs"].keys() != expected
-            or any(len(card) != 4 or any(not field.strip() for field in card)
-                   for card in deck["pairs"].values())):
-        raise ValueError("Expected a title, two parts and a line for all 36 pairs.")
+    for key, card in deck["pairs"].items():
+        ids = key.split("-")
+        if (len(ids) != 2 or ids != sorted(ids) or any(role_id not in roles for role_id in ids)
+                or len(card) != 4 or any(not field.strip() for field in card)):
+            raise ValueError(f"Invalid archived pair: {key}")
     return deck
 
 
@@ -118,9 +119,9 @@ def home(roles):
       <div class="intro">
         <p id="invite" class="invite" hidden></p>
         <h1>你在县城<br>有什么<em>隐藏属性</em>？</h1>
-        <p class="intro-copy">八道熟人局情境题，测测饭局、夜市和同学群里，大家会给你封个什么称号。</p>
-        <p class="start-row"><a class="button primary" id="start" href="#quiz">开始测评 <span aria-hidden="true">↗</span></a><span>8 道题，约 2 分钟</span></p>
-        <p class="hint">领完卡还能喊朋友来搭伙。</p>
+        <p class="intro-copy">从饭局、夜市、同学群里抽几道题，翻一张县城人物卡。</p>
+        <p class="start-row"><a class="button primary" id="start" href="#quiz">开始测评 <span aria-hidden="true">↗</span></a><span>每轮 6 题，答 1 题就能翻卡</span></p>
+        <p class="hint">也可以喊朋友来，各翻一张卡。</p>
         <noscript><p class="hint">开启 JavaScript 就能开始答题。</p></noscript>
       </div>
       <div class="hero-art">
@@ -142,8 +143,10 @@ def home(roles):
         <fieldset><legend class="visually-hidden">你会先怎么做？</legend><div id="options"></div></fieldset>
         <div class="question-controls">
           <button type="button" class="button quiet" id="previous">上一题</button>
-          <button type="submit" class="button primary" id="next" disabled>下一题</button>
+          <button type="button" class="button quiet" id="next">跳过本题</button>
+          <button type="submit" class="button primary" id="finish" disabled>翻开我的卡</button>
         </div>
+        <p class="hint" id="finish-hint">选一个答案就可以翻卡。</p>
       </form>
     </section>
     """
@@ -238,6 +241,58 @@ def share_actions():
     """
 
 
+def gallery_portrait(role):
+    return f"{GALLERY}gallery/characters/{role['slug']}/portrait.jpg"
+
+
+def gallery_result(role_id, role, base):
+    return f"""
+    <article class="result role-result">
+      <figure class="result-portrait">
+        <img src="{gallery_portrait(role)}" alt="{escape(role['name'])}的图鉴肖像" width="864" height="1152">
+        <figcaption>图鉴原型 {role_id} · {escape(role['name'])}</figcaption>
+      </figure>
+      <div class="result-copy">
+        <p class="ticket">隐藏属性卡</p>
+        <h1>{escape(role['name'])}</h1>
+        <p class="punchline">{escape(role['style'])}</p>
+        <p>{escape(role['intro'])}</p>
+        <p>{archive(role)}</p>
+        <div class="result-actions">
+          {quiz_link(base, role_id, "邀请好友翻卡")}
+          <a class="button secondary" href="{base}?new=1#quiz">再测一次</a>
+        </div>
+        {share_actions()}
+      </div>
+    </article>
+    """
+
+
+def pair_shell(base):
+    return f"""
+    <article class="result duo-result" id="pair-view" hidden>
+      <div class="duo-intro">
+        <h1>我们的县城人物卡</h1>
+      </div>
+      <div class="duo-cards" id="pair-cards"></div>
+      {share_actions()}
+      <p class="duo-start"><a href="{base}?new=1#quiz">我也测一张</a></p>
+    </article>
+    <section class="question-sheet" id="pair-missing" hidden>
+      <h1>找不到这两张卡</h1>
+      <p><a class="button primary" href="{base}">回到测试首页</a></p>
+    </section>
+    <noscript><p class="hint">开启 JavaScript 就可以打开双人卡。</p></noscript>
+    """
+
+
+def write_module(output, name, data):
+    (output / "assets" / f"{name}.mjs").write_text(
+        "export default " + json.dumps(data, ensure_ascii=False, separators=(",", ":")) + ";\n",
+        encoding="utf-8", newline="\n",
+    )
+
+
 def share_data(data, url):
     code = QrCode.encode_text(url, QrCode.Ecc.MEDIUM)
     size = code.get_size()
@@ -249,15 +304,17 @@ def share_data(data, url):
 
 
 def write_page(output, path, template, site_url, play_url, *, base, title, description,
-               content, script=None, og=None):
+               content, script=None, og=None, stylesheet="style.css"):
     canonical = site_url + path
     image, width, height, alt = og or ("assets/share.jpg", 1200, 630, TITLE)
+    image_url = image if urlsplit(image).scheme else site_url + image
     footer_play = (f'<p><a href="{escape(play_url)}">可以试试县城浮世绘 · 领卡处 ↗</a></p>'
                    if play_url else "")
     rendered = template.substitute(
         title=escape(title), description=escape(description), canonical=escape(canonical),
-        og_image=escape(site_url + image), og_width=width, og_height=height, og_alt=escape(alt),
-        base=escape(base), script=(f'<script type="module" src="{base}assets/{script}"></script>'
+        og_image=escape(image_url), og_width=width, og_height=height, og_alt=escape(alt),
+        base=escape(base), stylesheet=stylesheet,
+        script=(f'<script type="module" src="{base}assets/{script}"></script>'
                                    if script else ""),
         content=content, gallery=GALLERY, source=SOURCE,
         gallery_source=GALLERY_SOURCE, license=LICENSE, footer_play=footer_play,
@@ -267,8 +324,9 @@ def write_page(output, path, template, site_url, play_url, *, base, title, descr
     file.write_text(rendered, encoding="utf-8", newline="\n")
 
 
-def build(output, site_url, play_url, gallery=None):
+def build(output, site_url, play_url, gallery_source, gallery=None):
     deck = load_deck()
+    cards, pools, questions = load_catalog(gallery_source, SRC)
     if gallery:
         verify_gallery(deck, gallery)
     if output.exists() and any(output.iterdir()):
@@ -278,20 +336,24 @@ def build(output, site_url, play_url, gallery=None):
     template = Template((SRC / "page.html").read_text(encoding="utf-8"))
     for directory in ("assets", "portraits"):
         shutil.copytree(SRC / directory, output / directory)
+    shutil.copyfile(SRC / "assets/style.css", output / "assets/style-v2.css")
     for name in ("LICENSE", "ASSET-LICENSE.md"):
         shutil.copyfile(ROOT / name, output / name)
     if not (output / "assets/share.jpg").is_file():
         raise ValueError("Missing social preview image.")
     version, roles = deck["version"], deck["roles"]
-    browser_deck = {"version": version, "questions": deck["questions"],
-                    "roles": {key: role["title"] for key, role in roles.items()}}
-    (output / "assets/deck.mjs").write_text(
-        "export default " + json.dumps(browser_deck, ensure_ascii=False) + ";\n",
-        encoding="utf-8", newline="\n",
-    )
+    for style, ids in pools.items():
+        for role_id in ids:
+            cards[role_id]["style"] = STYLES[style]
+    write_module(output, "questions-v2", {
+        "version": VERSION, "questions": questions, "pools": pools,
+        "roles": {key: card["name"] for key, card in cards.items()},
+    })
+    write_module(output, "cards", {"cards": cards, "gallery": GALLERY,
+                                   "version": VERSION, "site": site_url})
     write_page(output, "", template, site_url, play_url, base="./", title=TITLE,
-               description="八道熟人局情境题。测出你的县城隐藏属性，再约朋友领一张搭档卡。",
-               content=home(roles), script="quiz.mjs")
+               description="每次抽六道县城生活题，答一道就能翻开你的人物卡。也可以约朋友一起翻卡。",
+               content=home(roles), script="quiz-v2.mjs", stylesheet="style-v2.css")
 
     base = "../../../"
     for role_id, role in roles.items():
@@ -315,13 +377,31 @@ def build(output, site_url, play_url, gallery=None):
                    title=f"{pair[0]}｜{TITLE}", description=pair[3], content=content,
                    script="share.mjs")
 
+    for role_id, role in cards.items():
+        path = result_path(VERSION, [role_id])
+        image = gallery_portrait(role)
+        data = {"kind": "role", "title": role["name"], "line": "县城人物图鉴",
+                "prop": role["style"], "detailLabel": "翻卡风格", "role": role["name"],
+                "accent": "#274738", "id": role_id, "edition": VERSION}
+        content = gallery_result(role_id, role, base) + share_data(data, site_url + path)
+        write_page(output, path, template, site_url, play_url, base=base,
+                   title=f'{role["name"]}｜{TITLE}', description=role["intro"],
+                   content=content, script="share.mjs",
+                   og=(image, 864, 1152, f'{role["name"]}的图鉴肖像'), stylesheet="style-v2.css")
+
+    pair_base = "../../"
+    write_page(output, f"duo/{VERSION}/", template, site_url, play_url, base=pair_base,
+               title=f"我们的县城人物卡｜{TITLE}", description="一起看看朋友抽到了哪两位县城人物。",
+               content=pair_shell(pair_base), script="pair.mjs", stylesheet="style-v2.css")
+
     fallback = escape(urlsplit(site_url).path)
     write_page(output, "404.html", template, site_url, play_url, base=fallback,
                title=f"找不到这张卡｜{TITLE}", description="回到测试首页领一张新的县城属性卡。",
                content=f'<section class="question-sheet"><h1>找不到这张卡</h1>'
                        f'<p>可以回首页领一张新的。</p><a class="button primary" href="{fallback}">回首页</a></section>')
     (output / ".nojekyll").touch()
-    print(f"Built {len(roles)} role pages and {len(deck['pairs'])} duo pages in {output}")
+    print(f"Built {len(cards)} v2 role pages, one v2 pair page and "
+          f"{len(roles) + len(deck['pairs'])} archived result pages in {output}")
 
 
 if __name__ == "__main__":
@@ -329,6 +409,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, default=ROOT / "dist", help="empty output directory")
     parser.add_argument("--site-url", default=DEFAULT_URL, help="public URL used in cards and QR codes")
     parser.add_argument("--play-url", default=DEFAULT_PLAY_URL, help="URL of the live AI card site")
+    parser.add_argument("--gallery-source", type=Path, default=ROOT / ".gallery-source",
+                        help="public CountyUkiyoe checkout at the revision pinned in catalog.py")
     parser.add_argument("--verify-gallery", type=Path, help="public gallery checkout for provenance verification")
     args = parser.parse_args()
-    build(args.output.resolve(), args.site_url, args.play_url, args.verify_gallery)
+    build(args.output.resolve(), args.site_url, args.play_url, args.gallery_source, args.verify_gallery)

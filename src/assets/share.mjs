@@ -9,7 +9,8 @@ const posterImage = byId('poster-image');
 const download = byId('poster-download');
 const copyButton = byId('copy-link');
 const posterButton = byId('poster-open');
-const shareText = data.kind === 'role' ? '来和「' + data.title + '」搭伙。' : '我们在县城搭伙的结果';
+const shareText = data.edition ? (data.kind === 'role' ? '我翻到了「' + data.title + '」。' : '我们的县城人物卡')
+  : (data.kind === 'role' ? '来和「' + data.title + '」搭伙。' : '我们在县城搭伙的结果');
 let posterFile;
 let posterPending;
 let posterUrl;
@@ -87,13 +88,13 @@ function drawDetails(ctx, info, y) {
     ctx.fillRect(75, y, 690, 148);
     ctx.fillStyle = paper;
     ctx.font = '700 26px ' + sans;
-    ctx.fillText('随身道具', 105, y + 40);
+    ctx.fillText(info.detailLabel ?? '随身道具', 105, y + 40);
     ctx.font = '700 53px ' + display;
-    ctx.fillText(info.prop, 105, y + 79);
+    ctx.fillText(info.prop, 105, y + 79, 225);
     ctx.font = '700 24px ' + sans;
     ctx.fillText('图鉴原型', 357, y + 42);
     ctx.font = '700 31px ' + sans;
-    ctx.fillText(info.role, 357, y + 88);
+    ctx.fillText(info.role, 357, y + 88, 377);
     return;
   }
   info.roles.forEach((role, index) => {
@@ -132,7 +133,7 @@ function createPoster(info) {
   ctx.fillText('县城浮世绘', 100, 98);
   ctx.textAlign = 'right';
   ctx.font = '700 27px ' + sans;
-  ctx.fillText(info.kind === 'duo' ? '双人搭档卡' : '隐藏属性卡', 740, 109);
+  ctx.fillText(info.kind === 'duo' ? (info.edition ? '双人结果' : '双人搭档卡') : '隐藏属性卡', 740, 109);
   ctx.textAlign = 'left';
 
   ctx.font = '700 77px ' + display;
@@ -153,7 +154,9 @@ function createPoster(info) {
   ctx.font = '700 36px ' + display;
   ctx.fillText('扫码领你的县城属性', 75, 838);
   ctx.font = '25px ' + sans;
-  ctx.fillText(info.kind === 'duo' ? '打开搭档卡，选一位接着测' : '打开这张卡，测测你俩怎么搭伙', 75, 900);
+  const prompt = info.edition ? '看看你会翻到哪位县城人物'
+    : (info.kind === 'duo' ? '打开搭档卡，选一位接着测' : '打开这张卡，测测你俩怎么搭伙');
+  ctx.fillText(prompt, 75, 900);
   ctx.font = '20px ' + sans;
   ctx.fillText('县城隐藏属性测试 · 朋友局娱乐', 75, 1002);
   drawQR(ctx, info.qr, 555, 820, 210);
@@ -163,6 +166,19 @@ function createPoster(info) {
   });
 }
 
+async function makePoster() {
+  if (!data.qr) {
+    const { default: qrcode } = await import('./qrcode.mjs');
+    const code = qrcode(0, 'M');
+    code.addData(data.url);
+    code.make();
+    const size = code.getModuleCount();
+    data.qr = Array.from({ length: size }, (_, row) =>
+      Array.from({ length: size }, (_, col) => code.isDark(row, col) ? '1' : '0').join(''));
+  }
+  return createPoster(data);
+}
+
 async function openPoster() {
   if (!dialog.open) {
     if (typeof dialog.showModal === 'function') dialog.showModal();
@@ -170,7 +186,7 @@ async function openPoster() {
   }
   if (posterUrl || posterPending) return;
   posterStatus.textContent = '正在排版海报…';
-  posterPending = createPoster(data);
+  posterPending = makePoster();
   try {
     const blob = await posterPending;
     const fileName = 'county-quiz-' + data.id + '.png';

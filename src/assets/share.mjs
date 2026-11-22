@@ -7,6 +7,8 @@ const shareLink = byId('share-link');
 const posterShare = byId('poster-share');
 const posterImage = byId('poster-image');
 const download = byId('poster-download');
+const copyButton = byId('copy-link');
+const posterButton = byId('poster-open');
 const shareText = data.kind === 'role' ? '来和「' + data.title + '」搭伙。' : '我们在县城搭伙的结果';
 let posterFile;
 let posterPending;
@@ -33,6 +35,14 @@ async function sendShare(payload, status, help) {
     status.textContent = '';
   } catch (error) {
     if (error.name !== 'AbortError') status.textContent = help;
+  }
+}
+
+function canSharePoster(file) {
+  try {
+    return !!(file && typeof navigator.share === 'function' && navigator.canShare?.({ files: [file] }));
+  } catch {
+    return false;
   }
 }
 
@@ -171,7 +181,7 @@ async function openPoster() {
     download.href = posterUrl;
     download.download = fileName;
     download.hidden = false;
-    posterShare.hidden = !(posterFile && typeof navigator.share === 'function' && navigator.canShare?.({ files: [posterFile] }));
+    posterShare.hidden = !canSharePoster(posterFile);
     posterStatus.textContent = '可以下载，手机上也可以长按图片保存。';
   } catch {
     posterStatus.textContent = '这次海报没画出来，可以关掉重试，或复制结果链接。';
@@ -184,11 +194,11 @@ if (typeof dialog.showModal !== 'function') {
   dialog.querySelector('form').addEventListener('submit', event => {
     event.preventDefault();
     dialog.removeAttribute('open');
-    byId('poster-open').focus();
+    posterButton.focus();
   });
 }
-byId('copy-link').addEventListener('click', copyLink);
-byId('poster-open').addEventListener('click', openPoster);
+copyButton.addEventListener('click', copyLink);
+posterButton.addEventListener('click', openPoster);
 posterShare.addEventListener('click', () => {
   if (posterFile) sendShare({ files: [posterFile], title: data.title }, posterStatus, '可以下载或长按图片保存。');
 });
@@ -199,3 +209,5 @@ if (typeof navigator.share === 'function') {
   });
 }
 document.querySelector('.result').classList.add('reveal');
+copyButton.disabled = false;
+posterButton.disabled = false;

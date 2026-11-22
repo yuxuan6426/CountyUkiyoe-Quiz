@@ -213,8 +213,8 @@ def share_actions():
     return """
     <section class="share" aria-label="分享结果">
       <p class="share-tools">
-        <button type="button" class="button solid" id="poster-open">生成分享海报</button>
-        <button type="button" class="button quiet" id="copy-link">复制链接</button>
+        <button type="button" class="button solid" id="poster-open" disabled>生成分享海报</button>
+        <button type="button" class="button quiet" id="copy-link" disabled>复制链接</button>
         <button type="button" class="button quiet" id="share-link" hidden>系统分享</button>
       </p>
       <label id="manual-copy" hidden>选中链接后复制

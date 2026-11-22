@@ -2,7 +2,7 @@
 
 八道熟人局情境题，从县城人物图鉴里测一张隐藏属性卡。把链接发给朋友，对方答完就能领一张双人搭档卡。单人卡和搭档卡都能生成带二维码的分享海报。
 
-[打开测试](https://yuxuan6426.github.io/CountyUkiyoe-Quiz/) · [试试领卡处](https://yuxuan6426.github.io/CountyUkiyoe-Play/) · [翻阅人物图鉴](https://yuxuan6426.github.io/CountyUkiyoe/)
+[打开测试](https://quiz.yuxuan.wiki/) · [试试领卡处](https://card.yuxuan.wiki/) · [翻阅人物图鉴](https://xian.yuxuan.wiki/)
 
 ## 本地预览
 

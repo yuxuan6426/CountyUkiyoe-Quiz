@@ -2,7 +2,7 @@
 
 ## GitHub Pages
 
-仓库 Pages 的发布源选 GitHub Actions。推送 `main` 或手动运行 `Deploy quiz to GitHub Pages`，工作流会测试计分、构建并发布 `dist/`。默认公开地址是 `https://yuxuan6426.github.io/CountyUkiyoe-Quiz/`。
+仓库 Pages 的发布源选 GitHub Actions。推送 `main` 或手动运行 `Deploy quiz to GitHub Pages`，工作流会测试计分、构建并发布 `dist/`。正式入口为 `https://quiz.yuxuan.wiki/`。
 
 ## 自有服务器
 
@@ -12,7 +12,7 @@
 python build.py --output dist-server --site-url https://your-host.example/quiz/
 ```
 
-将 `dist-server/` 的内容放到对应的静态目录。服务器需为带尾部斜杠的页面返回其 `index.html`，并可将站点的 `404.html` 配为该路径下的自定义 404。切换到域名根路径时，把 `--site-url` 改为 `https://your-host.example/`。若领卡处也已迁移，用 `--play-url` 设置新地址。
+将 `dist-server/` 的内容放到对应的静态目录。服务器需为带尾部斜杠的页面返回其 `index.html`，并可将站点的 `404.html` 配为该路径下的自定义 404。切换到域名根路径时，把 `--site-url` 改为 `https://your-host.example/`。默认领卡入口为 `https://card.yuxuan.wiki/`，另行部署时可用 `--play-url` 指定目标。
 
 部署后打开首页、任一个 `r/v1/<编号>/` 及任一个 `duo/v1/<编号>-<编号>/`，打开一张单人及双人海报，用手机扫码确认都返回当前域名。保留旧的 `v1` 路径或以相同路径重定向，让此前发出的二维码和结果链接继续可用。
 

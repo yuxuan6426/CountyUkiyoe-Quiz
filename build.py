@@ -20,10 +20,10 @@ SRC = ROOT / "src"
 TITLE = "县城隐藏属性测试"
 SOURCE = "https://github.com/yuxuan6426/CountyUkiyoe-Quiz"
 GALLERY_SOURCE = "https://github.com/yuxuan6426/CountyUkiyoe"
-GALLERY = "https://yuxuan6426.github.io/CountyUkiyoe/"
+GALLERY = "https://xian.yuxuan.wiki/"
 LICENSE = "https://creativecommons.org/licenses/by-nc-nd/4.0/deed.zh-hans"
-DEFAULT_URL = "https://yuxuan6426.github.io/CountyUkiyoe-Quiz/"
-DEFAULT_PLAY_URL = "https://yuxuan6426.github.io/CountyUkiyoe-Play/"
+DEFAULT_URL = "https://quiz.yuxuan.wiki/"
+DEFAULT_PLAY_URL = "https://card.yuxuan.wiki/"
 
 
 def web_base(value):

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN" prefix="og: https://ogp.me/ns#">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5db79">
+  <title>$title</title>
+  <meta name="description" content="$description">
+  <link rel="canonical" href="$canonical">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="$title">
+  <meta property="og:description" content="$description">
+  <meta property="og:url" content="$canonical">
+  <meta property="og:image" content="$og_image">
+  <meta property="og:image:width" content="$og_width">
+  <meta property="og:image:height" content="$og_height">
+  <meta property="og:image:alt" content="$og_alt">
+  <link rel="icon" type="image/png" href="${base}assets/icon.png">
+  <link rel="stylesheet" href="${base}assets/style.css">
+  $script
+</head>
+<body>
+  <a class="skip" href="#main">跳到正文</a>
+  <header class="masthead">
+    <div class="wrap mast-inner">
+      <a class="brand" href="$base">县城浮世绘</a>
+      <a class="mast-link" href="$gallery">翻人物图鉴 <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+  <main id="main" class="wrap">
+    $content
+  </main>
+  <footer class="wrap footer">
+    <p>县城浮世绘人物图鉴 · yuxuan6426<br><a href="$gallery_source">图鉴来源</a> <span aria-hidden="true">/</span> <a href="$license">肖像许可</a> <span aria-hidden="true">/</span> <a href="$source">测评源码</a></p>
+    $footer_play
+  </footer>
+</body>
+</html>

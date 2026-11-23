@@ -9,24 +9,28 @@ const posterImage = byId('poster-image');
 const download = byId('poster-download');
 const copyButton = byId('copy-link');
 const posterButton = byId('poster-open');
-const shareText = data.edition ? (data.kind === 'role' ? '我翻到了「' + data.title + '」。' : '我们的县城人物卡')
-  : (data.kind === 'role' ? '来和「' + data.title + '」搭伙。' : '我们在县城搭伙的结果');
+const isPair = data.kind === 'duo';
+const invitation = isPair ? '喊上朋友，各翻一张县城人物卡。' : '你会翻到哪位县城人物？点开也测一张。';
+const shareText = isPair
+  ? `我们在县城隐藏属性测试翻到了「${data.roles[0]}」和「${data.roles[1]}」。\n${invitation}`
+  : `我在县城隐藏属性测试翻到了「${data.role}」。\n${invitation}`;
+const shareCopy = `${shareText}\n\n${data.url}`;
 let posterFile;
 let posterPending;
 let posterUrl;
 
-async function copyLink() {
+async function copyShare() {
   try {
-    await navigator.clipboard.writeText(data.url);
+    await navigator.clipboard.writeText(shareCopy);
     byId('manual-copy').hidden = true;
-    shareStatus.textContent = '已复制，可以发给朋友。';
+    shareStatus.textContent = '分享文案已复制。';
   } catch {
     byId('manual-copy').hidden = false;
-    const input = byId('share-url');
-    input.value = data.url;
+    const input = byId('share-copy');
+    input.value = shareCopy;
     input.focus();
     input.select();
-    shareStatus.textContent = '链接已选中，可以手动复制。';
+    shareStatus.textContent = '分享文案已选中，可以直接复制。';
   }
 }
 
@@ -82,37 +86,18 @@ const red = '#a8332b';
 const sans = '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
 const display = '"STZhongsong", "Songti SC", "Noto Serif CJK SC", "SimSun", serif';
 
-function drawDetails(ctx, info, y) {
-  if (info.kind === 'role') {
-    ctx.fillStyle = info.accent;
-    ctx.fillRect(75, y, 690, 148);
-    ctx.fillStyle = paper;
-    ctx.font = '700 26px ' + sans;
-    ctx.fillText(info.detailLabel ?? '随身道具', 105, y + 40);
-    ctx.font = '700 53px ' + display;
-    ctx.fillText(info.prop, 105, y + 79, 225);
-    ctx.font = '700 24px ' + sans;
-    ctx.fillText('图鉴原型', 357, y + 42);
-    ctx.font = '700 31px ' + sans;
-    ctx.fillText(info.role, 357, y + 88, 377);
-    return;
-  }
-  info.roles.forEach((role, index) => {
-    const x = 75 + index * 353;
-    ctx.fillStyle = index ? '#e2ebdc' : '#f8e8a9';
-    ctx.fillRect(x, y, 337, 187);
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, 337, 187);
-    ctx.fillStyle = ink;
-    ctx.font = '700 30px ' + sans;
-    writeLines(ctx, role.title, x + 17, y + 28, 303, 34);
-    ctx.font = '25px ' + sans;
-    writeLines(ctx, role.part, x + 17, y + 88, 303, 35);
-  });
+function drawPortrait(ctx, image, x, y, width, height) {
+  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+  const imageWidth = image.naturalWidth * scale;
+  const imageHeight = image.naturalHeight * scale;
+  ctx.fillStyle = '#e2ebdc';
+  ctx.fillRect(x, y, width, height);
+  ctx.drawImage(image, x + (width - imageWidth) / 2, y + (height - imageHeight) / 2, imageWidth, imageHeight);
+  ctx.strokeStyle = ink;
+  ctx.strokeRect(x, y, width, height);
 }
 
-function createPoster(info) {
+function createPoster(info, portraits) {
   const canvas = document.createElement('canvas');
   canvas.width = 840;
   canvas.height = 1120;
@@ -133,15 +118,29 @@ function createPoster(info) {
   ctx.fillText('县城浮世绘', 100, 98);
   ctx.textAlign = 'right';
   ctx.font = '700 27px ' + sans;
-  ctx.fillText(info.kind === 'duo' ? (info.edition ? '双人结果' : '双人搭档卡') : '隐藏属性卡', 740, 109);
+  ctx.fillText(isPair ? '双人结果' : '隐藏属性卡', 740, 109);
   ctx.textAlign = 'left';
 
-  ctx.font = '700 77px ' + display;
-  const bodyY = writeLines(ctx, info.title, 75, 209, 690, 92);
-  ctx.fillStyle = red;
-  ctx.font = '700 34px ' + sans;
-  const detailY = writeLines(ctx, info.line, 75, bodyY + 18, 690, 49) + 33;
-  drawDetails(ctx, info, Math.max(detailY, 466));
+  if (isPair) {
+    portraits.forEach((image, index) => {
+      const x = 75 + index * 353;
+      drawPortrait(ctx, image, x, 205, 337, 449);
+      ctx.fillStyle = ink;
+      ctx.font = '700 36px ' + display;
+      writeLines(ctx, info.roles[index], x, 679, 337, 44);
+    });
+  } else {
+    drawPortrait(ctx, portraits[0], 75, 205, 417, 556);
+    ctx.fillStyle = red;
+    ctx.font = '700 27px ' + sans;
+    ctx.fillText('我翻到的县城人物', 520, 256);
+    ctx.fillStyle = ink;
+    ctx.font = '700 46px ' + display;
+    const nameEnd = writeLines(ctx, info.role, 520, 310, 245, 60);
+    ctx.fillStyle = red;
+    ctx.font = '700 29px ' + sans;
+    writeLines(ctx, info.detail, 520, nameEnd + 24, 245, 37);
+  }
 
   ctx.setLineDash([8, 8]);
   ctx.strokeStyle = ink;
@@ -152,13 +151,11 @@ function createPoster(info) {
   ctx.setLineDash([]);
   ctx.fillStyle = ink;
   ctx.font = '700 36px ' + display;
-  ctx.fillText('扫码领你的县城属性', 75, 838);
+  ctx.fillText('扫码翻一张县城人物卡', 75, 838);
   ctx.font = '25px ' + sans;
-  const prompt = info.edition ? '看看你会翻到哪位县城人物'
-    : (info.kind === 'duo' ? '打开搭档卡，选一位接着测' : '打开这张卡，测测你俩怎么搭伙');
-  ctx.fillText(prompt, 75, 900);
+  ctx.fillText('答一道题就能翻卡', 75, 900);
   ctx.font = '20px ' + sans;
-  ctx.fillText('县城隐藏属性测试 · 朋友局娱乐', 75, 1002);
+  ctx.fillText('肖像：县城浮世绘人物图鉴 · yuxuan6426', 75, 1002, 450);
   drawQR(ctx, info.qr, 555, 820, 210);
 
   return new Promise((resolve, reject) => {
@@ -167,6 +164,8 @@ function createPoster(info) {
 }
 
 async function makePoster() {
+  const portraits = [...document.querySelectorAll('.result-portrait img, .duo-role img')];
+  await Promise.all(portraits.map(image => image.decode()));
   if (!data.qr) {
     const { default: qrcode } = await import('./qrcode.mjs');
     const code = qrcode(0, 'M');
@@ -176,7 +175,7 @@ async function makePoster() {
     data.qr = Array.from({ length: size }, (_, row) =>
       Array.from({ length: size }, (_, col) => code.isDark(row, col) ? '1' : '0').join(''));
   }
-  return createPoster(data);
+  return createPoster(data, portraits);
 }
 
 async function openPoster() {
@@ -200,7 +199,7 @@ async function openPoster() {
     posterShare.hidden = !canSharePoster(posterFile);
     posterStatus.textContent = '可以下载，手机上也可以长按图片保存。';
   } catch {
-    posterStatus.textContent = '这次海报没画出来，可以关掉重试，或复制结果链接。';
+    posterStatus.textContent = '这次海报没画出来，可以关掉重试，或复制分享文案。';
   } finally {
     posterPending = null;
   }
@@ -213,7 +212,7 @@ if (typeof dialog.showModal !== 'function') {
     posterButton.focus();
   });
 }
-copyButton.addEventListener('click', copyLink);
+copyButton.addEventListener('click', copyShare);
 posterButton.addEventListener('click', openPoster);
 posterShare.addEventListener('click', () => {
   if (posterFile) sendShare({ files: [posterFile], title: data.title }, posterStatus, '可以下载或长按图片保存。');
@@ -221,7 +220,7 @@ posterShare.addEventListener('click', () => {
 if (typeof navigator.share === 'function') {
   shareLink.hidden = false;
   shareLink.addEventListener('click', () => {
-    sendShare({ title: data.title, text: shareText, url: data.url }, shareStatus, '可以点「复制链接」发给朋友。');
+    sendShare({ title: data.title, text: shareText, url: data.url }, shareStatus, '可以点「复制分享文案」发给朋友。');
   });
 }
 document.querySelector('.result').classList.add('reveal');

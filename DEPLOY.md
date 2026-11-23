@@ -16,4 +16,4 @@ python build.py --gallery-source .gallery-source --output dist-server --site-url
 
 在新发布目录放置构建产物，先预览首页、`r/v2/0055/`、`duo/v2/?a=0055&b=1190`，以及已有的 `r/v1/0055/` 和 `duo/v1/0055-0055/`。切换后核验提前翻卡、好友邀请和两种海报码的回流，保留上个目录以便回退。
 
-页面、样式、脚本与海报处理都由静态站提供。新版结果按需展示公开图鉴站的原肖像，旧版结果继续使用随站发布的肖像。
+构建复制公开图鉴的原肖像到 `portraits/v2/`。结果页按需载入肖像，浏览器可直接把同源肖像绘制到海报。图鉴直达链接使用 `https://xian.yuxuan.wiki/site/character.html?card=<slug>`。

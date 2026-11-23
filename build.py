@@ -102,9 +102,17 @@ def portrait(role_id, role, base, *, eager=False):
             f'width="864" height="1152" loading="{loading}" decoding="async">')
 
 
+def gallery_card_url(role):
+    return f"{GALLERY}site/character.html?card={role['slug']}"
+
+
+def linked_portrait(role, image):
+    return (f'<a class="portrait-link" href="{gallery_card_url(role)}" '
+            f'aria-label="查看{escape(role["name"])}的图鉴卡">{image}</a>')
+
+
 def archive(role):
-    slug = role["slug"]
-    return f'<a class="archive" href="{GALLERY}gallery/characters/{slug}/dossier.md">读图鉴档案 ↗</a>'
+    return f'<a class="archive" href="{gallery_card_url(role)}">查看图鉴卡 ↗</a>'
 
 
 def home(roles):
@@ -159,7 +167,7 @@ def quiz_link(base, role_id, label, css="button primary"):
 def role_result(role_id, role, base):
     return f"""
     <article class="result role-result">
-      <figure class="result-portrait">{portrait(role_id, role, base, eager=True)}
+      <figure class="result-portrait">{linked_portrait(role, portrait(role_id, role, base, eager=True))}
         <figcaption>图鉴原型 {role_id} · {escape(role["name"])}</figcaption>
       </figure>
       <div class="result-copy">
@@ -187,7 +195,7 @@ def duo_result(ids, roles, pair, version, base):
         side = f"第 {index} 位 · " if ids[0] == ids[1] else ""
         cards.append(f"""
         <section class="duo-role">
-          <figure>{portrait(role_id, role, base)}
+          <figure>{linked_portrait(role, portrait(role_id, role, base))}
             <figcaption>{escape(role["name"])}</figcaption>
           </figure>
           <div class="duo-role-copy">
@@ -217,11 +225,11 @@ def share_actions():
     <section class="share" aria-label="分享结果">
       <p class="share-tools">
         <button type="button" class="button solid" id="poster-open" disabled>生成分享海报</button>
-        <button type="button" class="button quiet" id="copy-link" disabled>复制链接</button>
+        <button type="button" class="button quiet" id="copy-link" disabled>复制分享文案</button>
         <button type="button" class="button quiet" id="share-link" hidden>系统分享</button>
       </p>
-      <label id="manual-copy" hidden>选中链接后复制
-        <input id="share-url" type="url" readonly>
+      <label id="manual-copy" hidden>复制选中的分享文案
+        <textarea id="share-copy" rows="4" readonly></textarea>
       </label>
       <p class="share-status" id="share-status" role="status"></p>
       <dialog id="poster-dialog" aria-labelledby="poster-title">
@@ -241,15 +249,17 @@ def share_actions():
     """
 
 
-def gallery_portrait(role):
-    return f"{GALLERY}gallery/characters/{role['slug']}/portrait.jpg"
+def gallery_portrait_path(role_id):
+    return f"portraits/{VERSION}/{role_id}.jpg"
 
 
 def gallery_result(role_id, role, base):
+    image = (f'<img src="{base}{gallery_portrait_path(role_id)}" '
+             f'alt="{escape(role["name"])}的图鉴肖像" width="864" height="1152" decoding="async">')
     return f"""
     <article class="result role-result">
       <figure class="result-portrait">
-        <img src="{gallery_portrait(role)}" alt="{escape(role['name'])}的图鉴肖像" width="864" height="1152">
+        {linked_portrait(role, image)}
         <figcaption>图鉴原型 {role_id} · {escape(role['name'])}</figcaption>
       </figure>
       <div class="result-copy">
@@ -336,6 +346,10 @@ def build(output, site_url, play_url, gallery_source, gallery=None):
     template = Template((SRC / "page.html").read_text(encoding="utf-8"))
     for directory in ("assets", "portraits"):
         shutil.copytree(SRC / directory, output / directory)
+    (output / "portraits" / VERSION).mkdir()
+    for role_id, role in cards.items():
+        original = Path(gallery_source) / "gallery" / "characters" / role["slug"] / "portrait.jpg"
+        shutil.copyfile(original, output / gallery_portrait_path(role_id))
     shutil.copyfile(SRC / "assets/style.css", output / "assets/style-v2.css")
     for name in ("LICENSE", "ASSET-LICENSE.md"):
         shutil.copyfile(ROOT / name, output / name)
@@ -349,7 +363,7 @@ def build(output, site_url, play_url, gallery_source, gallery=None):
         "version": VERSION, "questions": questions, "pools": pools,
         "roles": {key: card["name"] for key, card in cards.items()},
     })
-    write_module(output, "cards", {"cards": cards, "gallery": GALLERY,
+    write_module(output, "cards-share", {"cards": cards, "galleryEntry": GALLERY + "site/character.html",
                                    "version": VERSION, "site": site_url})
     write_page(output, "", template, site_url, play_url, base="./", title=TITLE,
                description="每次抽六道县城生活题，答一道就能翻开你的人物卡。也可以约朋友一起翻卡。",
@@ -358,41 +372,39 @@ def build(output, site_url, play_url, gallery_source, gallery=None):
     base = "../../../"
     for role_id, role in roles.items():
         path = result_path(version, [role_id])
-        data = {"kind": "role", "title": role["title"], "line": role["line"], "prop": role["prop"],
-                "role": role["name"], "accent": role["accent"], "id": role_id}
+        data = {"kind": "role", "title": role["title"], "detail": role["prop"],
+                "role": role["name"], "id": role_id}
         content = role_result(role_id, role, base) + share_data(data, site_url + path)
         write_page(output, path, template, site_url, play_url, base=base,
                    title=f'{role["title"]}｜{TITLE}', description=role["line"],
-                   content=content, script="share.mjs",
-                   og=(f"portraits/{role_id}.jpg", 864, 1152, f'{role["name"]}的图鉴肖像'))
+                   content=content, script="share-cards.mjs",
+                   og=(f"portraits/{role_id}.jpg", 864, 1152, f'{role["name"]}的图鉴肖像'),
+                   stylesheet="style.css?v=share")
 
     for pair_key, pair in deck["pairs"].items():
         ids = pair_key.split("-")
         path = result_path(version, ids)
-        data = {"kind": "duo", "title": pair[0], "line": pair[3], "id": pair_key,
-                "roles": [{"title": roles[role_id]["title"], "part": part}
-                          for role_id, part in zip(ids, pair[1:3])]}
+        data = {"kind": "duo", "title": pair[0], "id": pair_key,
+                "roles": [roles[role_id]["name"] for role_id in ids]}
         content = duo_result(ids, roles, pair, version, base) + share_data(data, site_url + path)
         write_page(output, path, template, site_url, play_url, base=base,
                    title=f"{pair[0]}｜{TITLE}", description=pair[3], content=content,
-                   script="share.mjs")
+                   script="share-cards.mjs", stylesheet="style.css?v=share")
 
     for role_id, role in cards.items():
         path = result_path(VERSION, [role_id])
-        image = gallery_portrait(role)
-        data = {"kind": "role", "title": role["name"], "line": "县城人物图鉴",
-                "prop": role["style"], "detailLabel": "翻卡风格", "role": role["name"],
-                "accent": "#274738", "id": role_id, "edition": VERSION}
+        data = {"kind": "role", "title": role["name"], "role": role["name"],
+                "detail": role["style"], "id": role_id}
         content = gallery_result(role_id, role, base) + share_data(data, site_url + path)
         write_page(output, path, template, site_url, play_url, base=base,
                    title=f'{role["name"]}｜{TITLE}', description=role["intro"],
-                   content=content, script="share.mjs",
-                   og=(image, 864, 1152, f'{role["name"]}的图鉴肖像'), stylesheet="style-v2.css")
+                   content=content, script="share-cards.mjs", stylesheet="style-v2.css?v=share",
+                   og=(gallery_portrait_path(role_id), 864, 1152, f'{role["name"]}的图鉴肖像'))
 
     pair_base = "../../"
     write_page(output, f"duo/{VERSION}/", template, site_url, play_url, base=pair_base,
                title=f"我们的县城人物卡｜{TITLE}", description="一起看看朋友抽到了哪两位县城人物。",
-               content=pair_shell(pair_base), script="pair.mjs", stylesheet="style-v2.css")
+               content=pair_shell(pair_base), script="pair-cards.mjs", stylesheet="style-v2.css?v=share")
 
     fallback = escape(urlsplit(site_url).path)
     write_page(output, "404.html", template, site_url, play_url, base=fallback,

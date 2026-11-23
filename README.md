@@ -22,3 +22,33 @@ python -m http.server 8104 --bind 127.0.0.1 --directory dist
 GitHub Actions 运行计分测试，生成静态 `dist/` 并部署到 Pages。发布包可以直接放到普通静态服务器，完整步骤见 [部署说明](DEPLOY.md)。
 
 新版题目和人物分组在 [题库](src/questions.json) 和 [人物分组](src/pools.json)。分组根据图鉴档案中体现的行为整理，构建会校验每位在册人物都能抽到。答题在浏览器完成，分享链接只携带结果版本和公开人物编号。v1 结果由 [旧版题库](src/deck.json) 保留。肖像来源及使用许可见 [内容许可](ASSET-LICENSE.md)。
+
+## 部署入口
+
+| 站点 | GitHub Pages | 独立域名 |
+| --- | --- | --- |
+| 县城浮世绘人物图鉴 | [Pages](https://yuxuan6426.github.io/CountyUkiyoe/) | [Wiki](https://xian.yuxuan.wiki/) |
+| 县城隐藏属性测试 | [Pages](https://yuxuan6426.github.io/CountyUkiyoe-Quiz/) | [Wiki](https://quiz.yuxuan.wiki/) |
+| 县城浮世绘 AI 领卡处 | [Pages](https://yuxuan6426.github.io/CountyUkiyoe-Play/) | [Wiki](https://card.yuxuan.wiki/) |
+
+## 目录与维护
+
+```text
+src/              题库、人物分组、模板与交互
+vendor/           构建时的二维码编码器
+tests/            抽题、进度、计分及链接回归
+docs/             使用指引与开发记录
+artifacts/        本地验收与发布暂存
+dist/             构建输出
+```
+
+```sh
+python build.py --gallery-source .gallery-source
+node --test tests/quiz.test.mjs
+```
+
+生成目录为本次构建产物。代码遵循 [代码许可](LICENSE)，图鉴原创资产适用[图文许可](ASSET-LICENSE.md)。另见 [维护代理指引](AGENTS.md)、[AI 使用指引](docs/agent-guide.md)及[安全政策](SECURITY.md)。
+
+## English overview
+
+A browser-based quiz with early results and reusable invitations. Each guest completes a quiz independently and receives a pair card.

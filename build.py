@@ -13,6 +13,7 @@ import subprocess
 from urllib.parse import urlsplit
 
 from catalog import load_catalog, STYLES
+from release_checks import check_vendored, finish_release, prepare_output
 from vendor.qrcodegen import QrCode
 
 ROOT = Path(__file__).resolve().parent
@@ -27,6 +28,10 @@ DEFAULT_PLAY_URL = "https://card.yuxuan.wiki/"
 PAGES_ROOT = "https://yuxuan6426.github.io/"
 PAGES_GALLERY = PAGES_ROOT + "CountyUkiyoe/"
 PAGES_PLAY = PAGES_ROOT + "CountyUkiyoe-Play/"
+ASSETS = (
+    "icon.png", "pair-invite.mjs", "portrait-fallback.mjs", "qrcode.mjs", "quiz-core.mjs",
+    "quiz-entry.mjs", "share-invite.mjs", "share.jpg", "style.css",
+)
 
 
 def web_base(value):
@@ -371,12 +376,15 @@ def write_page(output, path, template, site_url, play_url, gallery_url, *, base,
 
 
 def build(output, site_url, play_url, gallery_source, gallery=None, gallery_url=None):
+    check_vendored(ROOT, {
+        'src/assets/qrcode.mjs': 'ea91d7118a5395289170da848b7c6758b996163bfbccf312591ab65a4911b7c0',
+        'vendor/qrcodegen.py': 'b089855caf16185c61421ea4927c1b213cf9468940d71fa8ab11ef83662dcc84',
+    })
+    output = prepare_output(ROOT, output)
     deck = load_deck()
     cards, pools, questions = load_catalog(gallery_source, SRC)
     if gallery:
         verify_gallery(deck, gallery)
-    if output.exists() and any(output.iterdir()):
-        raise ValueError(f"Choose an empty build output directory: {output}")
     site_url = web_base(site_url)
     pages = urlsplit(site_url).hostname == urlsplit(PAGES_ROOT).hostname
     gallery_url = web_base(gallery_url or (PAGES_GALLERY if pages else GALLERY))
@@ -384,15 +392,25 @@ def build(output, site_url, play_url, gallery_source, gallery=None, gallery_url=
         play_url = PAGES_PLAY if pages else DEFAULT_PLAY_URL
     play_url = web_base(play_url) if play_url else ""
     template = Template((SRC / "page.html").read_text(encoding="utf-8"))
-    for directory in ("assets", "portraits"):
-        shutil.copytree(SRC / directory, output / directory)
-    (output / "portraits" / VERSION).mkdir()
+    expected = []
+    (output / "assets").mkdir()
+    for name in ASSETS:
+        relative = f"assets/{name}"
+        shutil.copyfile(SRC / relative, output / relative)
+        expected.append(relative)
+    (output / "portraits" / VERSION).mkdir(parents=True)
+    for role_id in deck["roles"]:
+        relative = f"portraits/{role_id}.jpg"
+        shutil.copyfile(SRC / relative, output / relative)
+        expected.append(relative)
     for role_id, role in cards.items():
         original = Path(gallery_source) / "gallery" / "characters" / role["slug"] / "portrait.jpg"
         shutil.copyfile(original, output / gallery_portrait_path(role_id))
+        expected.append(gallery_portrait_path(role_id))
     shutil.copyfile(SRC / "assets/style.css", output / "assets/style-v2.css")
-    for name in ("LICENSE", "ASSET-LICENSE.md"):
+    for name in ("LICENSE", "ASSET-LICENSE.md", "THIRD-PARTY-NOTICES.md"):
         shutil.copyfile(ROOT / name, output / name)
+        expected.append(name)
     if not (output / "assets/share.jpg").is_file():
         raise ValueError("Missing social preview image.")
     version, roles = deck["version"], deck["roles"]
@@ -453,6 +471,15 @@ def build(output, site_url, play_url, gallery_source, gallery=None, gallery_url=
                content=f'<section class="question-sheet"><h1>找不到这张卡</h1>'
                        f'<p>可以回首页领一张新的。</p><a class="button primary" href="{fallback}">回首页</a></section>')
     (output / ".nojekyll").touch()
+    guide = (ROOT / "docs/agent-guide.md").read_text(encoding="utf-8")
+    guide = guide.replace(DEFAULT_URL, site_url).replace(GALLERY, gallery_url)
+    (output / "agent-guide.md").write_text(guide, encoding="utf-8")
+    expected.extend(("assets/style-v2.css", "assets/questions-v2.mjs", "assets/cards-invite.mjs",
+                     "index.html", "404.html", ".nojekyll", "agent-guide.md", f"duo/{VERSION}/index.html"))
+    expected.extend(result_path(version, [role_id]) + "index.html" for role_id in roles)
+    expected.extend(result_path(version, key.split("-")) + "index.html" for key in deck["pairs"])
+    expected.extend(result_path(VERSION, [role_id]) + "index.html" for role_id in cards)
+    finish_release(output, expected, site_url, wiki=not pages)
     print(f"Built {len(cards)} v2 role pages, one v2 pair page and "
           f"{len(roles) + len(deck['pairs'])} archived result pages in {output}")
 

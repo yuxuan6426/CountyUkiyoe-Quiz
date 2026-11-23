@@ -39,6 +39,8 @@ test('restore the exact round, including skipped questions and editable answers'
   assert.deepEqual(restoreRound(draft, byId), draft);
   assert.equal(restoreRound({ ...draft, ids: Array(6).fill(ids[0]) }, byId), null);
   assert.equal(restoreRound({ ...draft, answers: [9, 2, 0, null, null, 1] }, byId).answers[0], null);
+  assert.equal(restoreRound({ ...draft, ids: ['unknown', ...ids.slice(1)] }, byId), null);
+  assert.equal(restoreRound({ ...draft, answers: 'damaged' }, byId), null);
 });
 
 test('pair URLs preserve inviter order and allow repeated IDs', () => {
@@ -50,4 +52,5 @@ test('pair URLs preserve inviter order and allow repeated IDs', () => {
   assert.deepEqual(readPair(url.searchParams, roles), ['1190', '0055']);
   assert.deepEqual(readPair(new URLSearchParams('a=0055&b=0055'), roles), ['0055', '0055']);
   assert.equal(readPair(new URLSearchParams('a=0055&b=constructor'), roles), null);
+  assert.equal(readPair(new URLSearchParams('a=0055'), roles), null);
 });

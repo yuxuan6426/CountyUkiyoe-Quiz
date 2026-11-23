@@ -3,6 +3,7 @@ name: Deploy quiz to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -29,14 +30,24 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13'
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
       - run: node --test tests/quiz.test.mjs
       - run: python build.py --site-url https://yuxuan6426.github.io/CountyUkiyoe-Quiz/
+      - run: python build.py --output artifacts/wiki --site-url https://quiz.yuxuan.wiki/
+      - run: |
+          (cd dist && sha256sum --strict --quiet -c release.sha256)
+          (cd artifacts/wiki && sha256sum --strict --quiet -c release.sha256)
       - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
           path: dist
 
   deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:

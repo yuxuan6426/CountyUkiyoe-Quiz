@@ -21,7 +21,8 @@ let round;
 
 function loadDraft() {
   try {
-    return restoreRound(JSON.parse(sessionStorage.getItem(draftKey)), questionsById);
+    const draft = sessionStorage.getItem(draftKey);
+    return draft && draft.length <= 8192 ? restoreRound(JSON.parse(draft), questionsById) : null;
   } catch {
     return null;
   }

@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
       - run: node --test tests/quiz.test.mjs
       - run: python build.py --site-url https://yuxuan6426.github.io/CountyUkiyoe-Quiz/
@@ -41,10 +41,11 @@ jobs:
       - run: |
           (cd dist && sha256sum --strict --quiet -c release.sha256)
           (cd artifacts/wiki && sha256sum --strict --quiet -c release.sha256)
-      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
           path: dist
+          include-hidden-files: true
 
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
@@ -59,4 +60,4 @@ jobs:
     steps:
       - name: Publish the quiz
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

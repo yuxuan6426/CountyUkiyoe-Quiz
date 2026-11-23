@@ -12,7 +12,7 @@
 git clone https://github.com/yuxuan6426/CountyUkiyoe.git .gallery-source
 git -C .gallery-source checkout --detach 6c4154d4f5bf903d3ce6e944507a6106e23bc854
 python build.py --output dist --site-url http://127.0.0.1:8104/
-python -m http.server 8104 --bind 127.0.0.1 --directory dist
+python -c 'import http.server as h; from functools import partial; h.SimpleHTTPRequestHandler.extensions_map[".mjs"]="text/javascript"; h.ThreadingHTTPServer(("127.0.0.1", 8104), partial(h.SimpleHTTPRequestHandler, directory="dist")).serve_forever()'
 ```
 
 打开 [本地测试](http://127.0.0.1:8104/)。构建使用空目录，重新构建时为 `--output` 指定另一个空目录。已有这版公开图鉴也可通过 `--gallery-source` 传入。用 Node.js 22 或以上运行 `node --test tests/quiz.test.mjs` 验证抽题、计分、进度和双人链接。

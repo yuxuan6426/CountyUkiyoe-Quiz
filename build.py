@@ -20,11 +20,13 @@ SRC = ROOT / "src"
 TITLE = "县城隐藏属性测试"
 VERSION = "v2"
 SOURCE = "https://github.com/yuxuan6426/CountyUkiyoe-Quiz"
-GALLERY_SOURCE = "https://github.com/yuxuan6426/CountyUkiyoe"
 GALLERY = "https://xian.yuxuan.wiki/"
 LICENSE = "https://creativecommons.org/licenses/by-nc-nd/4.0/deed.zh-hans"
 DEFAULT_URL = "https://quiz.yuxuan.wiki/"
 DEFAULT_PLAY_URL = "https://card.yuxuan.wiki/"
+PAGES_ROOT = "https://yuxuan6426.github.io/"
+PAGES_GALLERY = PAGES_ROOT + "CountyUkiyoe/"
+PAGES_PLAY = PAGES_ROOT + "CountyUkiyoe-Play/"
 
 
 def web_base(value):
@@ -96,31 +98,37 @@ def result_path(version, ids):
     return f"{kind}/{version}/{'-'.join(sorted(ids))}/"
 
 
-def portrait(role_id, role, base, *, eager=False):
+def gallery_portrait_url(role, gallery_url):
+    return f'{gallery_url}gallery/characters/{role["slug"]}/portrait.jpg'
+
+
+def portrait(role_id, role, base, gallery_url, *, eager=False, versioned=False):
     loading = "eager" if eager else "lazy"
-    return (f'<img src="{base}portraits/{role_id}.jpg" alt="{escape(role["name"])}的图鉴肖像" '
+    backup = gallery_portrait_path(role_id) if versioned else f"portraits/{role_id}.jpg"
+    return (f'<img src="{gallery_portrait_url(role, gallery_url)}" data-backup="{base}{backup}" '
+            f'alt="{escape(role["name"])}的图鉴肖像" '
             f'width="864" height="1152" loading="{loading}" decoding="async">')
 
 
-def gallery_card_url(role):
-    return f"{GALLERY}site/character.html?card={role['slug']}"
+def gallery_card_url(role, gallery_url):
+    return f"{gallery_url}site/character.html?card={role['slug']}"
 
 
-def linked_portrait(role, image):
-    return (f'<a class="portrait-link" href="{gallery_card_url(role)}" '
+def linked_portrait(role, image, gallery_url):
+    return (f'<a class="portrait-link" href="{gallery_card_url(role, gallery_url)}" '
             f'aria-label="查看{escape(role["name"])}的图鉴卡">{image}</a>')
 
 
-def archive(role):
-    return f'<a class="archive" href="{gallery_card_url(role)}">查看图鉴卡 ↗</a>'
+def archive(role, gallery_url):
+    return f'<a class="archive" href="{gallery_card_url(role, gallery_url)}">查看图鉴卡 ↗</a>'
 
 
-def home(roles):
+def home(roles, gallery_url):
     featured = (("1105", "left"), ("1053", "right"), ("0206", "center"))
     prints = []
     for role_id, position in featured:
         role = roles[role_id]
-        image = portrait(role_id, role, "./", eager=position == "center")
+        image = linked_portrait(role, portrait(role_id, role, "./", gallery_url, eager=position == "center"), gallery_url)
         prints.append(f'<div class="print print-{position}">{image}<span>{escape(role["name"])}</span></div>')
     return f"""
     <section id="landing" class="landing">
@@ -137,7 +145,7 @@ def home(roles):
           {"".join(prints)}
           <div class="hero-stamp" aria-hidden="true">熟人局<br>验明正身</div>
         </div>
-        <p>选自<a href="{GALLERY}">县城浮世绘人物图鉴</a></p>
+        <p>选自<a href="{gallery_url}">县城浮世绘人物图鉴</a></p>
       </div>
     </section>
     <section id="quiz" class="question-sheet" aria-labelledby="question-title" hidden>
@@ -164,10 +172,40 @@ def quiz_link(base, role_id, label, css="button primary"):
     return f'<a class="{css}" href="{base}?with={role_id}#quiz">{label}</a>'
 
 
-def role_result(role_id, role, base):
+def invite_actions(base, role_id):
+    return f"""
+    <button class="button primary" type="button" id="invite-open" disabled>邀请好友翻卡</button>
+    <dialog id="invite-dialog" aria-labelledby="invite-title">
+      <div class="poster-toolbar">
+        <h2 id="invite-title">邀请好友翻卡</h2>
+        <form method="dialog"><button class="button quiet">关闭</button></form>
+      </div>
+      <div id="invite-options">
+        <p>你们想线上一起玩，还是当面答题？</p>
+        <div class="result-actions">
+          <button class="button primary" type="button" id="invite-online">线上邀请</button>
+          <a class="button secondary" href="{base}?with={role_id}#quiz">线下当面答</a>
+        </div>
+      </div>
+      <div id="invite-online-tools" hidden>
+        <p>把邀请发给好友。每位好友答完，都会与你生成一张双人卡。</p>
+        <div class="result-actions">
+          <button class="button primary" type="button" id="copy-invite">复制邀请文案</button>
+          <button class="button secondary" type="button" id="invite-poster">生成邀请海报</button>
+        </div>
+        <label id="invite-manual" hidden>复制选中的邀请文案
+          <textarea id="invite-copy" rows="4" readonly></textarea>
+        </label>
+        <p class="share-status" id="invite-status" role="status"></p>
+      </div>
+    </dialog>
+    """
+
+
+def role_result(role_id, role, base, gallery_url):
     return f"""
     <article class="result role-result">
-      <figure class="result-portrait">{linked_portrait(role, portrait(role_id, role, base, eager=True))}
+      <figure class="result-portrait">{linked_portrait(role, portrait(role_id, role, base, gallery_url, eager=True), gallery_url)}
         <figcaption>图鉴原型 {role_id} · {escape(role["name"])}</figcaption>
       </figure>
       <div class="result-copy">
@@ -175,9 +213,9 @@ def role_result(role_id, role, base):
         <h1>{escape(role["title"])}</h1>
         <p class="punchline">{escape(role["line"])}</p>
         <p>{escape(role["description"])}</p>
-        <p class="prop"><strong>随身道具</strong> {escape(role["prop"])} <span aria-hidden="true">/</span> {archive(role)}</p>
+        <p class="prop"><strong>随身道具</strong> {escape(role["prop"])} <span aria-hidden="true">/</span> {archive(role, gallery_url)}</p>
         <div class="result-actions">
-          {quiz_link(base, role_id, "跟 TA 搭伙")}
+          {invite_actions(base, role_id)}
           <a class="button secondary" href="{base}#quiz">我也测一张</a>
         </div>
         {share_actions()}
@@ -186,7 +224,7 @@ def role_result(role_id, role, base):
     """
 
 
-def duo_result(ids, roles, pair, version, base):
+def duo_result(ids, roles, pair, version, base, gallery_url):
     title, first, second, line = pair
     cards = []
     for index, (role_id, part) in enumerate(zip(ids, (first, second)), start=1):
@@ -195,13 +233,13 @@ def duo_result(ids, roles, pair, version, base):
         side = f"第 {index} 位 · " if ids[0] == ids[1] else ""
         cards.append(f"""
         <section class="duo-role">
-          <figure>{linked_portrait(role, portrait(role_id, role, base))}
+          <figure>{linked_portrait(role, portrait(role_id, role, base, gallery_url), gallery_url)}
             <figcaption>{escape(role["name"])}</figcaption>
           </figure>
           <div class="duo-role-copy">
             <h2>{side}{escape(role["title"])}</h2>
             <p>{escape(part)}</p>
-            <p class="duo-links"><a href="{card_url}">看个人卡</a> {archive(role)}</p>
+            <p class="duo-links"><a href="{card_url}">看个人卡</a> {archive(role, gallery_url)}</p>
             {quiz_link(base, role_id, "跟这位搭伙", "button secondary")}
           </div>
         </section>
@@ -226,7 +264,6 @@ def share_actions():
       <p class="share-tools">
         <button type="button" class="button solid" id="poster-open" disabled>生成分享海报</button>
         <button type="button" class="button quiet" id="copy-link" disabled>复制分享文案</button>
-        <button type="button" class="button quiet" id="share-link" hidden>系统分享</button>
       </p>
       <label id="manual-copy" hidden>复制选中的分享文案
         <textarea id="share-copy" rows="4" readonly></textarea>
@@ -253,13 +290,12 @@ def gallery_portrait_path(role_id):
     return f"portraits/{VERSION}/{role_id}.jpg"
 
 
-def gallery_result(role_id, role, base):
-    image = (f'<img src="{base}{gallery_portrait_path(role_id)}" '
-             f'alt="{escape(role["name"])}的图鉴肖像" width="864" height="1152" decoding="async">')
+def gallery_result(role_id, role, base, gallery_url):
+    image = portrait(role_id, role, base, gallery_url, eager=True, versioned=True)
     return f"""
     <article class="result role-result">
       <figure class="result-portrait">
-        {linked_portrait(role, image)}
+        {linked_portrait(role, image, gallery_url)}
         <figcaption>图鉴原型 {role_id} · {escape(role['name'])}</figcaption>
       </figure>
       <div class="result-copy">
@@ -267,9 +303,9 @@ def gallery_result(role_id, role, base):
         <h1>{escape(role['name'])}</h1>
         <p class="punchline">{escape(role['style'])}</p>
         <p>{escape(role['intro'])}</p>
-        <p>{archive(role)}</p>
+        <p>{archive(role, gallery_url)}</p>
         <div class="result-actions">
-          {quiz_link(base, role_id, "邀请好友翻卡")}
+          {invite_actions(base, role_id)}
           <a class="button secondary" href="{base}?new=1#quiz">再测一次</a>
         </div>
         {share_actions()}
@@ -313,7 +349,7 @@ def share_data(data, url):
     return f'<script type="application/json" id="share-data">{json_data}</script>'
 
 
-def write_page(output, path, template, site_url, play_url, *, base, title, description,
+def write_page(output, path, template, site_url, play_url, gallery_url, *, base, title, description,
                content, script=None, og=None, stylesheet="style.css"):
     canonical = site_url + path
     image, width, height, alt = og or ("assets/share.jpg", 1200, 630, TITLE)
@@ -326,15 +362,15 @@ def write_page(output, path, template, site_url, play_url, *, base, title, descr
         base=escape(base), stylesheet=stylesheet,
         script=(f'<script type="module" src="{base}assets/{script}"></script>'
                                    if script else ""),
-        content=content, gallery=GALLERY, source=SOURCE,
-        gallery_source=GALLERY_SOURCE, license=LICENSE, footer_play=footer_play,
+        content=content, gallery=gallery_url, source=SOURCE,
+        license=LICENSE, footer_play=footer_play,
     )
     file = output / (path if path.endswith(".html") else f"{path}index.html")
     file.parent.mkdir(parents=True, exist_ok=True)
     file.write_text(rendered, encoding="utf-8", newline="\n")
 
 
-def build(output, site_url, play_url, gallery_source, gallery=None):
+def build(output, site_url, play_url, gallery_source, gallery=None, gallery_url=None):
     deck = load_deck()
     cards, pools, questions = load_catalog(gallery_source, SRC)
     if gallery:
@@ -342,6 +378,10 @@ def build(output, site_url, play_url, gallery_source, gallery=None):
     if output.exists() and any(output.iterdir()):
         raise ValueError(f"Choose an empty build output directory: {output}")
     site_url = web_base(site_url)
+    pages = urlsplit(site_url).hostname == urlsplit(PAGES_ROOT).hostname
+    gallery_url = web_base(gallery_url or (PAGES_GALLERY if pages else GALLERY))
+    if play_url is None:
+        play_url = PAGES_PLAY if pages else DEFAULT_PLAY_URL
     play_url = web_base(play_url) if play_url else ""
     template = Template((SRC / "page.html").read_text(encoding="utf-8"))
     for directory in ("assets", "portraits"):
@@ -363,51 +403,52 @@ def build(output, site_url, play_url, gallery_source, gallery=None):
         "version": VERSION, "questions": questions, "pools": pools,
         "roles": {key: card["name"] for key, card in cards.items()},
     })
-    write_module(output, "cards-share", {"cards": cards, "galleryEntry": GALLERY + "site/character.html",
+    write_module(output, "cards-invite", {"cards": cards, "gallery": gallery_url,
                                    "version": VERSION, "site": site_url})
-    write_page(output, "", template, site_url, play_url, base="./", title=TITLE,
+    write_page(output, "", template, site_url, play_url, gallery_url, base="./", title=TITLE,
                description="每次抽六道县城生活题，答一道就能翻开你的人物卡。也可以约朋友一起翻卡。",
-               content=home(roles), script="quiz-v2.mjs", stylesheet="style-v2.css")
+               content=home(roles, gallery_url), script="quiz-entry.mjs", stylesheet="style-v2.css?v=invite")
 
     base = "../../../"
     for role_id, role in roles.items():
         path = result_path(version, [role_id])
         data = {"kind": "role", "title": role["title"], "detail": role["prop"],
-                "role": role["name"], "id": role_id}
-        content = role_result(role_id, role, base) + share_data(data, site_url + path)
-        write_page(output, path, template, site_url, play_url, base=base,
+                "role": role["name"], "id": role_id, "invite": f"{site_url}?with={role_id}"}
+        content = role_result(role_id, role, base, gallery_url) + share_data(data, site_url + path)
+        write_page(output, path, template, site_url, play_url, gallery_url, base=base,
                    title=f'{role["title"]}｜{TITLE}', description=role["line"],
-                   content=content, script="share-cards.mjs",
-                   og=(f"portraits/{role_id}.jpg", 864, 1152, f'{role["name"]}的图鉴肖像'),
-                   stylesheet="style.css?v=share")
+                   content=content, script="share-invite.mjs",
+                   og=(gallery_portrait_url(role, gallery_url), 864, 1152, f'{role["name"]}的图鉴肖像'),
+                   stylesheet="style.css?v=invite")
 
     for pair_key, pair in deck["pairs"].items():
         ids = pair_key.split("-")
         path = result_path(version, ids)
         data = {"kind": "duo", "title": pair[0], "id": pair_key,
                 "roles": [roles[role_id]["name"] for role_id in ids]}
-        content = duo_result(ids, roles, pair, version, base) + share_data(data, site_url + path)
-        write_page(output, path, template, site_url, play_url, base=base,
+        content = duo_result(ids, roles, pair, version, base, gallery_url) + share_data(data, site_url + path)
+        write_page(output, path, template, site_url, play_url, gallery_url, base=base,
                    title=f"{pair[0]}｜{TITLE}", description=pair[3], content=content,
-                   script="share-cards.mjs", stylesheet="style.css?v=share")
+                   script="share-invite.mjs", stylesheet="style.css?v=invite")
 
     for role_id, role in cards.items():
         path = result_path(VERSION, [role_id])
         data = {"kind": "role", "title": role["name"], "role": role["name"],
-                "detail": role["style"], "id": role_id}
-        content = gallery_result(role_id, role, base) + share_data(data, site_url + path)
-        write_page(output, path, template, site_url, play_url, base=base,
+                "detail": role["style"], "id": role_id, "invite": f"{site_url}?with={role_id}"}
+        content = gallery_result(role_id, role, base, gallery_url) + share_data(data, site_url + path)
+        write_page(output, path, template, site_url, play_url, gallery_url, base=base,
                    title=f'{role["name"]}｜{TITLE}', description=role["intro"],
-                   content=content, script="share-cards.mjs", stylesheet="style-v2.css?v=share",
-                   og=(gallery_portrait_path(role_id), 864, 1152, f'{role["name"]}的图鉴肖像'))
+                   content=content, script="share-invite.mjs", stylesheet="style-v2.css?v=invite",
+                   og=(gallery_portrait_url(role, gallery_url),
+                       864, 1152, f'{role["name"]}的图鉴肖像'))
 
     pair_base = "../../"
-    write_page(output, f"duo/{VERSION}/", template, site_url, play_url, base=pair_base,
+    write_page(output, f"duo/{VERSION}/", template, site_url, play_url, gallery_url, base=pair_base,
                title=f"我们的县城人物卡｜{TITLE}", description="一起看看朋友抽到了哪两位县城人物。",
-               content=pair_shell(pair_base), script="pair-cards.mjs", stylesheet="style-v2.css?v=share")
+               content=pair_shell(pair_base), script="pair-invite.mjs", stylesheet="style-v2.css?v=invite")
 
     fallback = escape(urlsplit(site_url).path)
-    write_page(output, "404.html", template, site_url, play_url, base=fallback,
+    write_page(output, "404.html", template, site_url, play_url, gallery_url, base=fallback,
                title=f"找不到这张卡｜{TITLE}", description="回到测试首页领一张新的县城属性卡。",
                content=f'<section class="question-sheet"><h1>找不到这张卡</h1>'
                        f'<p>可以回首页领一张新的。</p><a class="button primary" href="{fallback}">回首页</a></section>')
@@ -420,9 +461,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "dist", help="empty output directory")
     parser.add_argument("--site-url", default=DEFAULT_URL, help="public URL used in cards and QR codes")
-    parser.add_argument("--play-url", default=DEFAULT_PLAY_URL, help="URL of the live AI card site")
+    parser.add_argument("--play-url", help="AI card site URL, inferred from --site-url by default")
+    parser.add_argument("--gallery-url", help="gallery URL, inferred from --site-url by default")
     parser.add_argument("--gallery-source", type=Path, default=ROOT / ".gallery-source",
                         help="public CountyUkiyoe checkout at the revision pinned in catalog.py")
     parser.add_argument("--verify-gallery", type=Path, help="public gallery checkout for provenance verification")
     args = parser.parse_args()
-    build(args.output.resolve(), args.site_url, args.play_url, args.gallery_source, args.verify_gallery)
+    build(args.output.resolve(), args.site_url, args.play_url, args.gallery_source,
+          args.verify_gallery, args.gallery_url)

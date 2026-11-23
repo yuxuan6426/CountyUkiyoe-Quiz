@@ -1,7 +1,7 @@
-import catalog from './cards-share.mjs';
+import catalog from './cards-invite.mjs';
 import { readPair } from './quiz-core.mjs';
 
-const { cards, galleryEntry, site, version } = catalog;
+const { cards, gallery, site, version } = catalog;
 const siteBase = new URL('../', import.meta.url);
 const ids = readPair(new URLSearchParams(location.search), cards);
 
@@ -20,12 +20,13 @@ function link(text, href, className) {
 
 function makeCard(id, index) {
   const card = cards[id];
-  const cardUrl = new URL(galleryEntry);
+  const cardUrl = new URL('site/character.html', gallery);
   cardUrl.searchParams.set('card', card.slug);
   const section = element('section', 'duo-role');
   const figure = element('figure');
   const image = element('img');
-  image.src = new URL(`portraits/${version}/${id}.jpg`, siteBase);
+  image.src = new URL(`gallery/characters/${card.slug}/portrait.jpg`, gallery);
+  image.dataset.backup = new URL(`portraits/${version}/${id}.jpg`, siteBase).href;
   image.alt = `${card.name}的图鉴肖像`;
   image.width = 864;
   image.height = 1152;
@@ -61,7 +62,7 @@ async function showPair() {
     roles: ids.map(id => cards[id].name),
   });
   document.body.append(shareData);
-  await import('./share-cards.mjs');
+  await import('./share-invite.mjs');
 }
 
 if (ids) await showPair();

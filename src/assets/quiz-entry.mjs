@@ -1,5 +1,8 @@
 import deck from './questions-v2.mjs';
 import { drawQuestions, pickRole, quizResultUrl, restoreRound, ROUND_SIZE } from './quiz-core.mjs';
+import { addPortraitFallback } from './portrait-fallback.mjs';
+
+document.querySelectorAll('.hero-art img[data-backup]').forEach(addPortraitFallback);
 
 const byId = id => document.getElementById(id);
 const siteBase = new URL('../', import.meta.url);

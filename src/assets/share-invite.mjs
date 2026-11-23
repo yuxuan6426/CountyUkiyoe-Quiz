@@ -1,9 +1,10 @@
+import { addPortraitFallback } from './portrait-fallback.mjs';
+
 const byId = id => document.getElementById(id);
 const data = JSON.parse(byId('share-data').textContent);
 const shareStatus = byId('share-status');
 const posterStatus = byId('poster-status');
 const dialog = byId('poster-dialog');
-const shareLink = byId('share-link');
 const posterShare = byId('poster-share');
 const posterImage = byId('poster-image');
 const download = byId('poster-download');
@@ -15,22 +16,20 @@ const shareText = isPair
   ? `我们在县城隐藏属性测试翻到了「${data.roles[0]}」和「${data.roles[1]}」。\n${invitation}`
   : `我在县城隐藏属性测试翻到了「${data.role}」。\n${invitation}`;
 const shareCopy = `${shareText}\n\n${data.url}`;
-let posterFile;
-let posterPending;
-let posterUrl;
+const posters = new Map();
+let activePoster;
 
-async function copyShare() {
+async function copyText(value, field, manual, status, caption) {
   try {
-    await navigator.clipboard.writeText(shareCopy);
-    byId('manual-copy').hidden = true;
-    shareStatus.textContent = '分享文案已复制。';
+    await navigator.clipboard.writeText(value);
+    manual.hidden = true;
+    status.textContent = `${caption}已复制。`;
   } catch {
-    byId('manual-copy').hidden = false;
-    const input = byId('share-copy');
-    input.value = shareCopy;
-    input.focus();
-    input.select();
-    shareStatus.textContent = '分享文案已选中，可以直接复制。';
+    manual.hidden = false;
+    field.value = value;
+    field.focus();
+    field.select();
+    status.textContent = `${caption}已选中，可以直接复制。`;
   }
 }
 
@@ -118,7 +117,7 @@ function createPoster(info, portraits) {
   ctx.fillText('县城浮世绘', 100, 98);
   ctx.textAlign = 'right';
   ctx.font = '700 27px ' + sans;
-  ctx.fillText(isPair ? '双人结果' : '隐藏属性卡', 740, 109);
+  ctx.fillText(info.isInvite ? '好友翻卡邀请' : (isPair ? '双人结果' : '隐藏属性卡'), 740, 109);
   ctx.textAlign = 'left';
 
   if (isPair) {
@@ -133,7 +132,7 @@ function createPoster(info, portraits) {
     drawPortrait(ctx, portraits[0], 75, 205, 417, 556);
     ctx.fillStyle = red;
     ctx.font = '700 27px ' + sans;
-    ctx.fillText('我翻到的县城人物', 520, 256);
+    ctx.fillText(info.isInvite ? '邀请你一起翻卡' : '我翻到的县城人物', 520, 256);
     ctx.fillStyle = ink;
     ctx.font = '700 46px ' + display;
     const nameEnd = writeLines(ctx, info.role, 520, 310, 245, 60);
@@ -151,9 +150,9 @@ function createPoster(info, portraits) {
   ctx.setLineDash([]);
   ctx.fillStyle = ink;
   ctx.font = '700 36px ' + display;
-  ctx.fillText('扫码翻一张县城人物卡', 75, 838);
+  ctx.fillText(info.isInvite ? '扫码接受邀请' : '扫码翻一张县城人物卡', 75, 838);
   ctx.font = '25px ' + sans;
-  ctx.fillText('答一道题就能翻卡', 75, 900);
+  ctx.fillText(info.isInvite ? '答完就能生成你们的双人卡' : '答一道题就能翻卡', 75, 900);
   ctx.font = '20px ' + sans;
   ctx.fillText('肖像：县城浮世绘人物图鉴 · yuxuan6426', 75, 1002, 450);
   drawQR(ctx, info.qr, 555, 820, 210);
@@ -163,65 +162,125 @@ function createPoster(info, portraits) {
   });
 }
 
-async function makePoster() {
-  const portraits = [...document.querySelectorAll('.result-portrait img, .duo-role img')];
-  await Promise.all(portraits.map(image => image.decode()));
-  if (!data.qr) {
+const displayedPortraits = [...document.querySelectorAll('.result-portrait img, .duo-role img')];
+displayedPortraits.forEach(addPortraitFallback);
+
+async function portraitForPoster(image) {
+  if (new URL(image.src).origin === location.origin) {
+    await image.decode();
+    return image;
+  }
+  const portrait = new Image();
+  portrait.crossOrigin = 'anonymous';
+  portrait.src = image.src;
+  try {
+    await portrait.decode();
+  } catch (error) {
+    if (!image.dataset.backup) throw error;
+    portrait.src = image.dataset.backup;
+    await portrait.decode();
+  }
+  return portrait;
+}
+
+async function makePoster(info) {
+  const portraits = await Promise.all(displayedPortraits.map(portraitForPoster));
+  if (!info.qr) {
     const { default: qrcode } = await import('./qrcode.mjs');
     const code = qrcode(0, 'M');
-    code.addData(data.url);
+    code.addData(info.url);
     code.make();
     const size = code.getModuleCount();
-    data.qr = Array.from({ length: size }, (_, row) =>
+    info.qr = Array.from({ length: size }, (_, row) =>
       Array.from({ length: size }, (_, col) => code.isDark(row, col) ? '1' : '0').join(''));
   }
-  return createPoster(data, portraits);
+  const blob = await createPoster(info, portraits);
+  const fileName = `county-quiz-${info.isInvite ? 'invite-' : ''}${info.id}.png`;
+  return { url: URL.createObjectURL(blob), fileName,
+    file: typeof File === 'function' ? new File([blob], fileName, { type: 'image/png' }) : null,
+    title: info.title };
 }
 
-async function openPoster() {
-  if (!dialog.open) {
-    if (typeof dialog.showModal === 'function') dialog.showModal();
-    else dialog.setAttribute('open', '');
-  }
-  if (posterUrl || posterPending) return;
+function showDialog(panel) {
+  if (panel.open) return;
+  if (typeof panel.showModal === 'function') panel.showModal();
+  else panel.setAttribute('open', '');
+}
+
+async function openPoster(info) {
+  const key = info.url;
+  showDialog(dialog);
+  byId('poster-title').textContent = info.isInvite ? '邀请海报' : '分享海报';
+  activePoster = null;
+  posterImage.hidden = true;
+  download.hidden = true;
+  posterShare.hidden = true;
   posterStatus.textContent = '正在排版海报…';
-  posterPending = makePoster();
+  if (!posters.has(key)) posters.set(key, makePoster(info));
+  const request = posters.get(key);
   try {
-    const blob = await posterPending;
-    const fileName = 'county-quiz-' + data.id + '.png';
-    posterUrl = URL.createObjectURL(blob);
-    if (typeof File === 'function') posterFile = new File([blob], fileName, { type: 'image/png' });
-    posterImage.src = posterUrl;
+    const poster = await request;
+    if (byId('poster-title').textContent !== (info.isInvite ? '邀请海报' : '分享海报')) return;
+    activePoster = poster;
+    posterImage.src = poster.url;
     posterImage.hidden = false;
-    download.href = posterUrl;
-    download.download = fileName;
+    download.href = poster.url;
+    download.download = poster.fileName;
     download.hidden = false;
-    posterShare.hidden = !canSharePoster(posterFile);
+    posterShare.hidden = !canSharePoster(poster.file);
     posterStatus.textContent = '可以下载，手机上也可以长按图片保存。';
   } catch {
-    posterStatus.textContent = '这次海报没画出来，可以关掉重试，或复制分享文案。';
-  } finally {
-    posterPending = null;
+    posters.delete(key);
+    if (byId('poster-title').textContent === (info.isInvite ? '邀请海报' : '分享海报')) {
+      posterStatus.textContent = '这次海报没画出来，可以关掉重试，或直接复制文案。';
+    }
   }
 }
 
-if (typeof dialog.showModal !== 'function') {
-  dialog.querySelector('form').addEventListener('submit', event => {
-    event.preventDefault();
-    dialog.removeAttribute('open');
-    posterButton.focus();
-  });
+function supportDialogClose(panel, opener) {
+  if (typeof panel.showModal !== 'function') {
+    panel.querySelector('form').addEventListener('submit', event => {
+      event.preventDefault();
+      panel.removeAttribute('open');
+      opener.focus();
+    });
+  }
 }
-copyButton.addEventListener('click', copyShare);
-posterButton.addEventListener('click', openPoster);
+
+supportDialogClose(dialog, posterButton);
+copyButton.addEventListener('click', () => copyText(shareCopy, byId('share-copy'),
+  byId('manual-copy'), shareStatus, '分享文案'));
+posterButton.addEventListener('click', () => openPoster(data));
 posterShare.addEventListener('click', () => {
-  if (posterFile) sendShare({ files: [posterFile], title: data.title }, posterStatus, '可以下载或长按图片保存。');
+  if (activePoster?.file) sendShare({ files: [activePoster.file], title: activePoster.title },
+    posterStatus, '可以下载或长按图片保存。');
 });
-if (typeof navigator.share === 'function') {
-  shareLink.hidden = false;
-  shareLink.addEventListener('click', () => {
-    sendShare({ title: data.title, text: shareText, url: data.url }, shareStatus, '可以点「复制分享文案」发给朋友。');
+
+if (data.invite) {
+  const inviteDialog = byId('invite-dialog');
+  const inviteButton = byId('invite-open');
+  supportDialogClose(inviteDialog, inviteButton);
+  inviteButton.addEventListener('click', () => {
+    byId('invite-options').hidden = false;
+    byId('invite-online-tools').hidden = true;
+    byId('invite-manual').hidden = true;
+    byId('invite-status').textContent = '';
+    showDialog(inviteDialog);
   });
+  byId('invite-online').addEventListener('click', () => {
+    byId('invite-options').hidden = true;
+    byId('invite-online-tools').hidden = false;
+    byId('copy-invite').focus();
+  });
+  const message = `我翻到了「${data.role}」。点开邀请也翻一张，看看我们的双人卡！\n\n${data.invite}`;
+  byId('copy-invite').addEventListener('click', () => copyText(message, byId('invite-copy'),
+    byId('invite-manual'), byId('invite-status'), '邀请文案'));
+  byId('invite-poster').addEventListener('click', () => {
+    if (typeof inviteDialog.close === 'function') inviteDialog.close();
+    else inviteDialog.removeAttribute('open');
+    openPoster({ ...data, title: '好友翻卡邀请', url: data.invite, qr: null, isInvite: true });
+  });
+  inviteButton.disabled = false;
 }
 document.querySelector('.result').classList.add('reveal');
 copyButton.disabled = false;

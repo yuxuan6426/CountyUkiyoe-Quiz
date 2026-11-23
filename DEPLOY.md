@@ -2,7 +2,7 @@
 
 ## GitHub Pages
 
-仓库 Pages 的发布源选 GitHub Actions。推送 `main` 或手动运行 `Deploy quiz to GitHub Pages`，工作流会检出固定版本的公开图鉴、执行测试并发布 `dist/`。正式入口为 `https://quiz.yuxuan.wiki/`。
+仓库 Pages 的发布源选 GitHub Actions。推送 `main` 或手动运行 `Deploy quiz to GitHub Pages`，工作流会检出固定版本的公开图鉴、执行测试并发布 `dist/`。正式访问有 [独立域名](https://quiz.yuxuan.wiki/) 和 [GitHub Pages](https://yuxuan6426.github.io/CountyUkiyoe-Quiz/) 两套。构建按 `--site-url` 选择同一套部署的领卡处和图鉴。
 
 ## 自有服务器
 
@@ -16,4 +16,4 @@ python build.py --gallery-source .gallery-source --output dist-server --site-url
 
 在新发布目录放置构建产物，先预览首页、`r/v2/0055/`、`duo/v2/?a=0055&b=1190`，以及已有的 `r/v1/0055/` 和 `duo/v1/0055-0055/`。切换后核验提前翻卡、好友邀请和两种海报码的回流，保留上个目录以便回退。
 
-构建复制公开图鉴的原肖像到 `portraits/v2/`。结果页按需载入肖像，浏览器可直接把同源肖像绘制到海报。图鉴直达链接使用 `https://xian.yuxuan.wiki/site/character.html?card=<slug>`。
+结果页优先载入对应图鉴站的原肖像。图鉴 JPEG 跨域请求不可用时，海报使用随产物发布的原肖像备份。独立域名部署的人物直达链接使用 `https://xian.yuxuan.wiki/site/character.html?card=<slug>`。

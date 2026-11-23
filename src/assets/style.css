@@ -240,7 +240,9 @@ fieldset { min-width: 0; padding: 0; margin: 0; border: 0; }
 .share-status:not(:empty), #manual-copy { margin-top: .6rem; }
 .share-status { color: var(--quiet); font-size: .9rem; }
 #manual-copy { display: grid; gap: .3rem; font-size: .9rem; }
-#share-copy { width: 100%; padding: .5rem; resize: vertical; font: inherit; border: 1px solid var(--ink); color: var(--ink); background: var(--paper); }
+#share-copy, #invite-copy { width: 100%; padding: .5rem; resize: vertical; font: inherit; border: 1px solid var(--ink); color: var(--ink); background: var(--paper); }
+#invite-manual { display: grid; gap: .3rem; font-size: .9rem; margin-top: .6rem; }
+#invite-dialog .poster-toolbar { margin-bottom: .75rem; }
 .duo-result { padding: clamp(1rem, 4.4vw, 2.8rem); }
 .duo-intro { max-width: 36em; }
 .duo-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; margin-top: 1.4rem; }
@@ -261,7 +263,7 @@ fieldset { min-width: 0; padding: 0; margin: 0; border: 0; }
 .duo-links a, .duo-start a { display: inline-flex; align-items: center; min-height: 44px; }
 .duo-start { margin-top: .3rem; }
 
-#poster-dialog {
+#poster-dialog, #invite-dialog {
   width: min(470px, calc(100vw - 24px));
   max-height: calc(100dvh - 24px);
   padding: 1rem;
@@ -269,8 +271,8 @@ fieldset { min-width: 0; padding: 0; margin: 0; border: 0; }
   background: var(--paper);
   color: var(--ink);
 }
-#poster-dialog:not([open]) { display: none; }
-#poster-dialog::backdrop { background: #15241ce0; }
+#poster-dialog:not([open]), #invite-dialog:not([open]) { display: none; }
+#poster-dialog::backdrop, #invite-dialog::backdrop { background: #15241ce0; }
 .poster-toolbar h2 { font: 900 1.35rem var(--display); }
 #poster-status { margin: .55rem 0; }
 #poster-image { width: min(100%, 320px); margin: .7rem auto; border: 1px solid var(--line); }

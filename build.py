@@ -473,7 +473,7 @@ def build(output, site_url, play_url, gallery_source, gallery=None, gallery_url=
     (output / ".nojekyll").touch()
     guide = (ROOT / "docs/agent-guide.md").read_text(encoding="utf-8")
     guide = guide.replace(DEFAULT_URL, site_url).replace(GALLERY, gallery_url)
-    (output / "agent-guide.md").write_text(guide, encoding="utf-8")
+    (output / "agent-guide.md").write_text(guide, encoding="utf-8", newline="\n")
     expected.extend(("assets/style-v2.css", "assets/questions-v2.mjs", "assets/cards-invite.mjs",
                      "index.html", "404.html", ".nojekyll", "agent-guide.md", f"duo/{VERSION}/index.html"))
     expected.extend(result_path(version, [role_id]) + "index.html" for role_id in roles)
